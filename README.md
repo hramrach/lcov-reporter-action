@@ -34,6 +34,10 @@ The location of the lcov file to read the coverage report from. Defaults to
 The location of the lcov file resulting from running the tests in the base
 branch. When this is set a diff of the coverage percentages is shown.
 
+##### `event` (**Optional**)
+The location of the file that has the saved github event that triggered the coverage report.
+For the case when the comment is generated in a separate workflow.
+
 ##### `filter-changed-files` (**Default: false**)
 If set to true, only changed files will be included in the report. Total percentage will still include all files.
 

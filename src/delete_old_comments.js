@@ -24,7 +24,7 @@ async function getExistingComments(github, options, context) {
 	let response
 	do {
 		response = await github.issues.listComments({
-			issue_number: context.issue.number,
+			issue_number: options.issue_number,
 			owner: context.repo.owner,
 			repo: context.repo.repo,
 			per_page: REQUESTED_COMMENTS_PER_PAGE,

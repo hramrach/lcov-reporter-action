@@ -17,6 +17,7 @@ async function main() {
 	const workingDir = core.getInput('working-directory') || './';	
 	const lcovFile = path.join(workingDir, core.getInput("lcov-file") || "./coverage/lcov.info")
 	const baseFile = core.getInput("lcov-base")
+	const eventFile = core.getInput("event")
 	const shouldFilterChangedFiles =
 		core.getInput("filter-changed-files").toLowerCase() === "true"
 	const shouldDeleteOldComments =
@@ -35,21 +36,29 @@ async function main() {
 		console.log(`No coverage report found at '${baseFile}', ignoring...`)
 	}
 
+	const eventRaw =
+		eventFile && (await fs.readFile(eventFile, "utf-8").catch(err => null));
+	if (eventFile && !eventRaw) {
+		console.log(`Failed to read event data from '${eventFile}', ignoring...`);
+	}
+	const event_data = eventRaw ? JSON.parse(eventRaw) : context.payload;
+
 	const options = {
-		repository: context.payload.repository.full_name,
+		repository: event_data.repository.full_name,
 		prefix: normalisePath(`${process.env.GITHUB_WORKSPACE}/`),
 		workingDir,
 	}
 
-	if (context.eventName === "pull_request" || context.eventName === "pull_request_target") {
-		options.commit = context.payload.pull_request.head.sha
-		options.baseCommit = context.payload.pull_request.base.sha
-		options.head = context.payload.pull_request.head.ref
-		options.base = context.payload.pull_request.base.ref
-	} else if (context.eventName === "push") {
-		options.commit = context.payload.after
-		options.baseCommit = context.payload.before
-		options.head = context.ref
+	if (event_data.pull_request) {
+		options.commit = event_data.pull_request.head.sha
+		options.baseCommit = event_data.pull_request.base.sha
+		options.head = event_data.pull_request.head.ref
+		options.base = event_data.pull_request.base.ref
+		options.issue_number = event_data.number
+	} else if (event_data.push) {
+		options.commit = event_data.after
+		options.baseCommit = event_data.before
+		options.head = event_data.ref
 	}
 
 	options.shouldFilterChangedFiles = shouldFilterChangedFiles
@@ -67,14 +76,14 @@ async function main() {
 		await deleteOldComments(githubClient, options, context)
 	}
 
-	if (context.eventName === "pull_request" || context.eventName === "pull_request_target") {
+	if (event_data.pull_request) {
 		await githubClient.issues.createComment({
 			repo: context.repo.repo,
 			owner: context.repo.owner,
-			issue_number: context.payload.pull_request.number,
+			issue_number: event_data.number,
 			body: body,
 		})
-	} else if (context.eventName === "push") {
+	} else if (event_data.push) {
 		await githubClient.repos.createCommitComment({
 			repo: context.repo.repo,
 			owner: context.repo.owner,

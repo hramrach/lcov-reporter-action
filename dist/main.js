@@ -23076,7 +23076,7 @@ async function getExistingComments(github, options, context) {
 	let response;
 	do {
 		response = await github.issues.listComments({
-			issue_number: context.issue.number,
+			issue_number: options.issue_number,
 			owner: context.repo.owner,
 			repo: context.repo.repo,
 			per_page: REQUESTED_COMMENTS_PER_PAGE,
@@ -23102,6 +23102,7 @@ async function main$1() {
 	const workingDir = core$1.getInput('working-directory') || './';	
 	const lcovFile = path.join(workingDir, core$1.getInput("lcov-file") || "./coverage/lcov.info");
 	const baseFile = core$1.getInput("lcov-base");
+	const eventFile = core$1.getInput("event");
 	const shouldFilterChangedFiles =
 		core$1.getInput("filter-changed-files").toLowerCase() === "true";
 	const shouldDeleteOldComments =
@@ -23120,21 +23121,29 @@ async function main$1() {
 		console.log(`No coverage report found at '${baseFile}', ignoring...`);
 	}
 
+	const eventRaw =
+		eventFile && (await fs.promises.readFile(eventFile, "utf-8").catch(err => null));
+	if (eventFile && !eventRaw) {
+		console.log(`Failed to read event data from '${eventFile}', ignoring...`);
+	}
+	const event_data = eventRaw ? JSON.parse(eventRaw) : github_1.payload;
+
 	const options = {
-		repository: github_1.payload.repository.full_name,
+		repository: event_data.repository.full_name,
 		prefix: normalisePath(`${process.env.GITHUB_WORKSPACE}/`),
 		workingDir,
 	};
 
-	if (github_1.eventName === "pull_request") {
-		options.commit = github_1.payload.pull_request.head.sha;
-		options.baseCommit = github_1.payload.pull_request.base.sha;
-		options.head = github_1.payload.pull_request.head.ref;
-		options.base = github_1.payload.pull_request.base.ref;
-	} else if (github_1.eventName === "push") {
-		options.commit = github_1.payload.after;
-		options.baseCommit = github_1.payload.before;
-		options.head = github_1.ref;
+	if (event_data.pull_request) {
+		options.commit = event_data.pull_request.head.sha;
+		options.baseCommit = event_data.pull_request.base.sha;
+		options.head = event_data.pull_request.head.ref;
+		options.base = event_data.pull_request.base.ref;
+		options.issue_number = event_data.number;
+	} else if (event_data.push) {
+		options.commit = event_data.after;
+		options.baseCommit = event_data.before;
+		options.head = event_data.ref;
 	}
 
 	options.shouldFilterChangedFiles = shouldFilterChangedFiles;
@@ -23152,14 +23161,14 @@ async function main$1() {
 		await deleteOldComments(githubClient, options, github_1);
 	}
 
-	if (github_1.eventName === "pull_request") {
+	if (event_data.pull_request) {
 		await githubClient.issues.createComment({
 			repo: github_1.repo.repo,
 			owner: github_1.repo.owner,
-			issue_number: github_1.payload.pull_request.number,
+			issue_number: event_data.number,
 			body: body,
 		});
-	} else if (github_1.eventName === "push") {
+	} else if (event_data.push) {
 		await githubClient.repos.createCommitComment({
 			repo: github_1.repo.repo,
 			owner: github_1.repo.owner,
