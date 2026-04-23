@@ -50,13 +50,23 @@ If included, will be added as a title for the comment produced.
 ## Example usage
 
 ```yml
-uses: romeovs/lcov-reporter-action@v0.3.1
+uses: hramrach/lcov-reporter-action@v0.5.0
 with:
   lcov-file: ./coverage/lcov.info
 ```
+
+## Making code changes
+
+The source code is in `src/`
+
+To generate updated code in `dist/` use `npm run build`
+
+To make use of the result you would need to commit it to git, push it to an online repository, and change your github action to reference your repository.
 
 ## Acknowledgements
 
 The initial code is based on [ziishaned/jest-reporter-action](https://github.com/ziishaned/jest-reporter-action).
 
 Changed file retrieval based on [jitterbit/get-changed-files](https://github.com/jitterbit/get-changed-files).
+
+Forked from [romeovs/lcov-reporter-action](https://github.com/romeovs/lcov-reporter-action).
