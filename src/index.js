@@ -1,6 +1,6 @@
 import { promises as fs } from "fs"
-import core from "@actions/core"
-import { GitHub, context } from "@actions/github"
+import * as core from "@actions/core"
+import * as github from "@actions/github"
 import path from "path"
 
 import { parse } from "./lcov"
@@ -13,7 +13,7 @@ const MAX_COMMENT_CHARS = 65536
 
 async function main() {
 	const token = core.getInput("github-token")
-	const githubClient = new GitHub(token)
+	const githubClient = new github.getOctokit(token)
 	const workingDir = core.getInput('working-directory') || './';	
 	const lcovFile = path.join(workingDir, core.getInput("lcov-file") || "./coverage/lcov.info")
 	const baseFile = core.getInput("lcov-base")
@@ -41,7 +41,7 @@ async function main() {
 	if (eventFile && !eventRaw) {
 		console.log(`Failed to read event data from '${eventFile}', ignoring...`);
 	}
-	const event_data = eventRaw ? JSON.parse(eventRaw) : context.payload;
+	const event_data = eventRaw ? JSON.parse(eventRaw) : github.context.payload;
 
 	const options = {
 		repository: event_data.repository.full_name,
@@ -65,7 +65,7 @@ async function main() {
 	options.title = title
 
 	if (shouldFilterChangedFiles) {
-		options.changedFiles = await getChangedFiles(githubClient, options, context)
+		options.changedFiles = await getChangedFiles(githubClient, options, github.context)
 	}
 
 	const lcov = await parse(raw)
@@ -73,20 +73,20 @@ async function main() {
 	const body = diff(lcov, baselcov, options).substring(0, MAX_COMMENT_CHARS)
 
 	if (shouldDeleteOldComments) {
-		await deleteOldComments(githubClient, options, context)
+		await deleteOldComments(githubClient, options, github.context)
 	}
 
 	if (event_data.pull_request) {
-		await githubClient.issues.createComment({
-			repo: context.repo.repo,
-			owner: context.repo.owner,
+		await githubClient.rest.issues.createComment({
+			repo: github.context.repo.repo,
+			owner: github.context.repo.owner,
 			issue_number: event_data.number,
 			body: body,
 		})
 	} else if (event_data.push) {
-		await githubClient.repos.createCommitComment({
-			repo: context.repo.repo,
-			owner: context.repo.owner,
+		await githubClient.rest.repos.createCommitComment({
+			repo: github.context.repo.repo,
+			owner: github.context.repo.owner,
 			commit_sha: options.commit,
 			body: body,
 		})
